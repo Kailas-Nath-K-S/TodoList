@@ -9,6 +9,7 @@ contract TodoContract {
         string description;
         bool isCompleted;
         address completedBy;
+        bool isVerified;
     }
 
     TodoToken public token;
@@ -17,9 +18,11 @@ contract TodoContract {
 
     mapping(address => bool) public admins;
     mapping(uint => Task) public tasks;
+    address[] public users;
 
     event TaskCreated(uint id, string description);
-    event TaskCompleted(uint id, address user, uint reward);
+    event TaskMarkedCompleted(uint id, address user);
+    event TaskVerified(uint id, address user, uint reward);
 
     modifier onlyAdmin() {
         require(admins[msg.sender], "Not an admin");
@@ -38,37 +41,45 @@ contract TodoContract {
 
     function createTask(string memory description) external onlyAdmin {
         taskCounter++;
-        tasks[taskCounter] = Task(taskCounter, description, false, address(0));
+        tasks[taskCounter] = Task(taskCounter, description, false, address(0), false);
         emit TaskCreated(taskCounter, description);
     }
-address[] public users;
-   function completeTask(uint taskId) external {
-    Task storage task = tasks[taskId];
-    require(!task.isCompleted, "Already completed");
-    task.isCompleted = true;
-    task.completedBy = msg.sender;
 
-    uint reward = 10 * 10**18; // 10 tokens
-    token.mint(msg.sender, reward);
+    function markTaskCompleted(uint taskId) external {
+        Task storage task = tasks[taskId];
+        require(!task.isCompleted, "Already marked completed");
+        require(task.completedBy == address(0), "Already submitted");
 
-    if (!isUserExists(msg.sender)) {
-        users.push(msg.sender);
-    }
+        task.completedBy = msg.sender;
+        task.isCompleted = true;
 
-    emit TaskCompleted(taskId, msg.sender, reward);
-}
-
-function isUserExists(address user) internal view returns (bool) {
-    for (uint i = 0; i < users.length; i++) {
-        if (users[i] == user) {
-            return true;
+        if (!isUserExists(msg.sender)) {
+            users.push(msg.sender);
         }
-    }
-    return false;
-}
 
-function getUsers() public view returns (address[] memory) {
-    return users;
-}
-    
+        emit TaskMarkedCompleted(taskId, msg.sender);
+    }
+
+    function verifyTask(uint taskId) external onlyAdmin {
+        Task storage task = tasks[taskId];
+        require(task.isCompleted, "Task not yet completed");
+        require(!task.isVerified, "Already verified");
+
+        task.isVerified = true;
+        uint reward = 10 * 10**18;
+        token.mint(task.completedBy, reward);
+
+        emit TaskVerified(taskId, task.completedBy, reward);
+    }
+
+    function isUserExists(address user) internal view returns (bool) {
+        for (uint i = 0; i < users.length; i++) {
+            if (users[i] == user) return true;
+        }
+        return false;
+    }
+
+    function getUsers() public view returns (address[] memory) {
+        return users;
+    }
 }

@@ -20,7 +20,7 @@ export default function App() {
       {wallet && (
         <>
           <TaskList wallet={wallet} provider={provider} />
-          <Leaderboard provider={provider} />
+   
         </>
       )}
     </div>

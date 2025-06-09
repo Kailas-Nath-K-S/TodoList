@@ -1,11 +1,11 @@
 // src/components/Leaderboard.jsx
 import { useEffect, useState } from "react";
 import todoAbi from "../abi/TodoContract.json";
-import tokenAbi from "../abi/TodoToken.json";
+import tokenAbi from "../abi/ToDoToken.json";
 import { ethers } from "ethers";
 
-const TODO_CONTRACT_ADDRESS = "0x3FC698b08dB126376B9Ad72f7349Dd7db8a2CaE8";
-const TOKEN_CONTRACT_ADDRESS = "0xBDfA765583e23f6a5c37CC1bc99F4423f8A4198b";
+const TODO_CONTRACT_ADDRESS = "0x32cFf59d3614E3e162920272b1a9941BB2B0CE9e";
+const TOKEN_CONTRACT_ADDRESS = "0x86e7d622960e9a1E934fC33B36a65298C4552dCa";
 
 export default function Leaderboard({ provider }) {
   const [users, setUsers] = useState([]);
@@ -49,7 +49,7 @@ export default function Leaderboard({ provider }) {
       <ol>
         {balances.map((user, idx) => (
           <li key={idx}>
-            {user.address.slice(0, 6)}...{user.address.slice(-4)} - {user.balance} tokens
+            {user.address} - {user.balance} tokens
           </li>
         ))}
       </ol>

@@ -4,7 +4,7 @@ import tokenAbi from "../abi/ToDoToken.json";
 import { ethers } from "ethers";
 import { toast } from "react-toastify";
 
-const TODO_CONTRACT_ADDRESS = "0x3FC698b08dB126376B9Ad72f7349Dd7db8a2CaE8";
+const TODO_CONTRACT_ADDRESS = "0x32cFf59d3614E3e162920272b1a9941BB2B0CE9e";
 
 export default function TaskList({ wallet }) {
   const [contract, setContract] = useState(null);
@@ -13,6 +13,7 @@ export default function TaskList({ wallet }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [newAdmin, setNewAdmin] = useState("");
   const [balance, setBalance] = useState("0");
+  const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
     const init = async () => {
@@ -37,7 +38,10 @@ export default function TaskList({ wallet }) {
   }, [wallet]);
 
   useEffect(() => {
-    if (contract) loadTasks();
+    if (contract) {
+      loadTasks();
+      loadLeaderboard();
+    }
   }, [contract]);
 
   const loadTasks = async () => {
@@ -51,6 +55,7 @@ export default function TaskList({ wallet }) {
           id: Number(task.id),
           description: task.description,
           isCompleted: task.isCompleted,
+          isVerified: task.isVerified,
           completedBy: task.completedBy,
         });
       }
@@ -61,14 +66,47 @@ export default function TaskList({ wallet }) {
     }
   };
 
-  const completeTask = async (taskId) => {
+  const loadLeaderboard = async () => {
     try {
-      const tx = await contract.completeTask(taskId);
+      const tokenAddr = await contract.token();
+      const token = new ethers.Contract(tokenAddr, tokenAbi.abi, wallet);
+
+      const users = await contract.getUsers();
+      const data = [];
+
+      for (let addr of users) {
+        const rawBalance = await token.balanceOf(addr);
+        const balance = Number(ethers.formatEther(rawBalance));
+        data.push({ address: addr, balance });
+      }
+
+      data.sort((a, b) => b.balance - a.balance);
+      setLeaderboard(data);
+    } catch (err) {
+      console.error("Failed to load leaderboard:", err);
+    }
+  };
+
+  const markTaskCompleted = async (taskId) => {
+    try {
+      const tx = await contract.markTaskCompleted(taskId);
       await tx.wait();
-      toast.success("✅ Task completed!");
+      toast.success("✅ Task marked as completed!");
       loadTasks();
     } catch (err) {
-      toast.error("❌ Failed to complete task");
+      toast.error("❌ Failed to mark task completed");
+    }
+  };
+
+  const verifyTask = async (taskId) => {
+    try {
+      const tx = await contract.verifyTask(taskId);
+      await tx.wait();
+      toast.success("🎉 Task verified and reward given!");
+      loadTasks();
+      loadLeaderboard(); // 🏆 update leaderboard
+    } catch (err) {
+      toast.error("❌ Failed to verify task");
     }
   };
 
@@ -133,17 +171,43 @@ export default function TaskList({ wallet }) {
         {tasks.length === 0 && <li>No tasks found.</li>}
         {tasks.map((task) => (
           <li key={task.id} style={{ marginBottom: "10px" }}>
-            {task.description}
-            {task.isCompleted ? (
-              <span> ✅</span>
-            ) : (
+            <strong>{task.description}</strong>
+            <br />
+            Status:{" "}
+            {task.isVerified
+              ? "✅ Verified"
+              : task.isCompleted
+              ? `⏳ Marked by: ${task.completedBy.slice(0, 6)}...`
+              : "🕒 Pending"}
+
+            {!isAdmin && !task.isCompleted && (
               <button
-                style={{ marginLeft: "10px" }}
-                onClick={() => completeTask(task.id)}
+                onClick={() => markTaskCompleted(task.id)}
+                style={{ marginLeft: 10 }}
               >
                 Complete
               </button>
             )}
+
+            {isAdmin && task.isCompleted && !task.isVerified && (
+              <button
+                onClick={() => verifyTask(task.id)}
+                style={{ marginLeft: 10 }}
+              >
+                Verify
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      <h3>🏆 Leaderboard</h3>
+      <ul>
+        {leaderboard.length === 0 && <li>No data yet.</li>}
+        {leaderboard.map((user, index) => (
+          <li key={user.address}>
+            #{index + 1} - {user.address.slice(0, 6)}...{user.address.slice(-4)}:{" "}
+            {user.balance} TODO
           </li>
         ))}
       </ul>
